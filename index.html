@@ -1,0 +1,77 @@
+javascript
+function fetchDailyEmails() {
+  // Configuration
+  const HOURS_TO_FETCH = 24; // Fetch emails from last 24 hours
+  const YOUR_EMAIL = "YOUR_EMAIL@gmail.com"; // Replace with your email
+  
+  // Calculate time range
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - (HOURS_TO_FETCH * 60 * 60 * 1000));
+  const dateString = Utilities.formatDate(yesterday, Session.getScriptTimeZone(), "yyyy/MM/dd");
+  
+  // Search query - customize this!
+  const query = `after:${dateString} -label:spam -label:trash`;
+  
+  // Fetch emails
+  const threads = GmailApp.search(query, 0, 50);
+  const emails = [];
+  
+  threads.forEach(function(thread) {
+    const messages = thread.getMessages();
+    const firstMessage = messages[0];
+    
+    // Auto-assign tags based on content
+    const subject = firstMessage.getSubject().toLowerCase();
+    const from = firstMessage.getFrom().toLowerCase();
+    const tags = [];
+    
+    // Smart tagging
+    if (subject.includes('urgent') || subject.includes('asap') || subject.includes('important')) {
+      tags.push('Action Required');
+    }
+    if (subject.includes('assessment') || subject.includes('evaluation')) {
+      tags.push('Assessment');
+    }
+    if (subject.includes('parent') || from.includes('parent')) {
+      tags.push('Parent Contact');
+    }
+    if (subject.includes('student') || subject.includes('essay') || subject.includes('homework')) {
+      tags.push('Student Work');
+    }
+    if (from.includes('calendar-notification@google.com')) {
+      tags.push('Calendar Event');
+    }
+    if (tags.length === 0) {
+      tags.push('General');
+    }
+    
+    // Build email object
+    emails.push({
+      sender: firstMessage.getFrom(),
+      subject: firstMessage.getSubject(),
+      received_at: firstMessage.getDate().toISOString(),
+      preview: firstMessage.getPlainBody().substring(0, 200).replace(/\n/g, ' '),
+      tags: tags
+    });
+  });
+  
+  // Convert to JSON
+  const jsonData = JSON.stringify(emails, null, 2);
+  
+  // Option 1: Email yourself the JSON
+  GmailApp.sendEmail(
+    YOUR_EMAIL,
+    "📧 Daily Email Organizer Data - " + Utilities.formatDate(now, Session.getScriptTimeZone(), "MMM dd, yyyy"),
+    "Your daily email data is attached.",
+    {
+      attachments: [Utilities.newBlob(jsonData, 'application/json', 'daily-emails.json')]
+    }
+  );
+  
+  Logger.log("✅ Successfully fetched " + emails.length + " emails and sent to your inbox!");
+}
+
+// Test function - run this first to make sure it works
+function testFetch() {
+  fetchDailyEmails();
+}
